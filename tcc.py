@@ -4,7 +4,7 @@ import talib
 import plotly.graph_objects as go
 
 # Coleta de dados da ação, por exemplo AAPL
-data = yf.download('VALE3.SA', start='2014-01-01', end='2024-09-30')
+data = yf.download('PETR4.SA', start='2016-01-01', end='2024-09-30')
 
 # Calcular indicadores técnicos usando TA-Lib
 data['RSI'] = talib.RSI(data['Close'], timeperiod=14)
@@ -43,12 +43,12 @@ fig.add_trace(go.Scatter(x=data.index, y=data['SMA'], mode='lines', name='Média
 
 # Adicionar sinais de compra (verde) ao gráfico
 fig.add_trace(go.Scatter(x=buy_signals.index, y=buy_signals['Close'], mode='markers', 
-                         marker=dict(symbol='triangle-up', color='green', size=10), 
+                         marker=dict(symbol='triangle-up', color='blue', size=10), 
                          name='Sinal de Compra'))
 
 # Adicionar sinais de venda (vermelho) ao gráfico
 fig.add_trace(go.Scatter(x=sell_signals.index, y=sell_signals['Close'], mode='markers', 
-                         marker=dict(symbol='triangle-down', color='red', size=10), 
+                         marker=dict(symbol='triangle-down', color='purple', size=10), 
                          name='Sinal de Venda'))
 
 # Configurar o layout do gráfico

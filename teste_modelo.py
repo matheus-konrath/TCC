@@ -2,9 +2,7 @@ import requests
 import pandas as pd
 import numpy as np
 import yfinance as yf
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score
+import talib
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.offline as pyo
@@ -43,42 +41,24 @@ data = pd.merge(data, selic_df, on='Date', how='left')
 # Preenchendo valores nulos de Selic com o último valor disponível
 data['Selic Rate'].fillna(method='ffill', inplace=True)
 
-# Features (usando CandleStick e taxa Selic)
-X = data[['Open', 'High', 'Low', 'Close', 'Volume', 'Selic Rate']]
-y = np.where(data['Close'] > data['Open'], 1, 0)  # Definindo padrões de CandleStick como base
+# Aplicando TA-Lib para identificar padrões de Candlestick
+# Exemplos de padrões de candlestick
+data['CDL_ENGULFING'] = talib.CDLENGULFING(data['Open'], data['High'], data['Low'], data['Close'])
+data['CDL_DOJI'] = talib.CDLDOJI(data['Open'], data['High'], data['Low'], data['Close'])
 
-# Dividindo os dados em treino e teste
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
-
-# Modelo de Machine Learning (Random Forest)
-model = RandomForestClassifier(n_estimators=100, random_state=42)
-model.fit(X_train, y_train)
-
-# Previsões
-y_pred = model.predict(X_test)
-
-# Avaliação do modelo
-accuracy = accuracy_score(y_test, y_pred)
-print(f"Accuracy do modelo: {accuracy:.2f}")
-
-# Função de recomendação de compra ou venda
-def investment_recommendation(model, X):
-    prediction = model.predict(X)
-    if prediction == 1:
-        return "Recomenda-se COMPRA."
+# Recomendação com base nos padrões
+def candlestick_recommendation(row):
+    if row['CDL_ENGULFING'] > 0 or row['CDL_DOJI'] > 0:
+        return "Compra"
+    elif row['CDL_ENGULFING'] < 0 or row['CDL_DOJI'] < 0:
+        return "Venda"
     else:
-        return "Recomenda-se VENDA."
+        return "Manter"
 
-# Teste com novos dados para gerar a recomendação
-sample_data = X_test.iloc[0:1]  # Usando a primeira linha de teste como exemplo
-recommendation = investment_recommendation(model, sample_data)
+# Aplicando a recomendação para cada linha de dados
+data['Recommendation'] = data.apply(candlestick_recommendation, axis=1)
 
-# Exibindo a recomendação de compra ou venda
-print(f"Recomendacao baseada nos dados recentes: {recommendation}")
-
-# Criando um gráfico interativo com Plotly
-
-# Criando a figura com eixos duplos
+# Criando o gráfico com Plotly
 fig = make_subplots(specs=[[{"secondary_y": True}]])
 
 # Gráfico Candlestick
@@ -95,9 +75,27 @@ fig.add_trace(go.Scatter(x=data['Date'], y=data['Selic Rate'],
                          mode='lines', name='Taxa Selic', line=dict(color='green')),
               secondary_y=True)
 
+# Adicionando as recomendações ao gráfico
+buy_signals = data['Date'][data['Recommendation'] == "Compra"]
+sell_signals = data['Date'][data['Recommendation'] == "Venda"]
+
+# Marcando os pontos de compra (seta verde)
+fig.add_trace(go.Scatter(x=buy_signals, 
+                         y=data['Close'][data['Recommendation'] == "Compra"],
+                         mode='markers', 
+                         marker=dict(color='green', symbol='triangle-up', size=10),
+                         name='Sinal de Compra'))
+
+# Marcando os pontos de venda (seta vermelha)
+fig.add_trace(go.Scatter(x=sell_signals, 
+                         y=data['Close'][data['Recommendation'] == "Venda"],
+                         mode='markers', 
+                         marker=dict(color='red', symbol='triangle-down', size=10),
+                         name='Sinal de Venda'))
+
 # Ajustando os títulos e eixos
 fig.update_layout(
-    title_text="Candlestick e Taxa Selic (Interativo)",
+    title_text="Candlestick e Taxa Selic com Recomendações de Compra e Venda (TA-Lib)",
     xaxis_title="Data",
     yaxis_title="Preço da Ação",
     legend_title="Indicadores",
@@ -110,5 +108,5 @@ fig.update_yaxes(title_text="Taxa Selic (%)", secondary_y=True)
 # Exibindo o gráfico interativo no navegador
 pyo.plot(fig)
 
-# Exibir recomendação também no console
-print(f"Recomendação Final: {recommendation}")
+# Exibir as primeiras recomendações
+print(data[['Date', 'Close', 'Recommendation']].head())
